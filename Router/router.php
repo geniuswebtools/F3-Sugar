@@ -31,6 +31,10 @@ class Router extends Prefab {
         $f3 = \Base::instance();
     	if(substr($pattern, 0, 3) === 'MAP') {
 		  $map_pattern = substr($pattern, 3);
+		  if(strstr($handler, '->')) {
+			list($class, $method) = explode('->', $handler, 2);
+			$handler = $class;
+		  }
 		  $f3->map($map_pattern,$handler,$ttl,$kbps);
 		}
 		else { $f3->route($pattern,$handler,$ttl,$kbps); }
