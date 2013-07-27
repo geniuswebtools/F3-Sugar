@@ -20,6 +20,10 @@ $router = \Router::instance();
 $router->register('newsletter-signin-page','GET /newsletter/subscribe/',function() {
     echo "hi, please fill out the form for subscribing to the newsletter";
 });
+
+... or you can map a class ...
+
+$router->register('newsletter','MAP /', 'NewsLetter');
 ```
 
 #### Access Route Template
