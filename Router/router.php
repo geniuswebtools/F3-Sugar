@@ -29,7 +29,11 @@ class Router extends Prefab {
         if(is_array($pattern))
             trigger_error('set multiple routes are not supported');
         $f3 = \Base::instance();
-        $f3->route($pattern,$handler,$ttl,$kbps);
+    	if(substr($pattern, 0, 3) === 'MAP') {
+		  $map_pattern = substr($pattern, 3);
+		  $f3->map($map_pattern,$handler,$ttl,$kbps);
+		}
+		else { $f3->route($pattern,$handler,$ttl,$kbps); }
         $expl = explode(' ',$pattern,2);
         $f3->set('ROUTES["'.$expl[1].'"].name',$name);
     }
