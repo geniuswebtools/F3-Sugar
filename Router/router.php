@@ -50,7 +50,8 @@ class Router extends Prefab {
         $routes = $f3->get('ROUTES');
         foreach($routes as $path=>$route)
             if(array_key_exists('name',$route) && $route['name'] == $name) {
-                $match = substr($path,1);
+                //$match = substr($path,1);
+                $match = $path;
                 break;
             }
         if (!isset($match))
