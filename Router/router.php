@@ -1,7 +1,7 @@
 <?php
 /**
     Router Plugin for the PHP Fat-Free Framework
-    
+
     The contents of this file are subject to the terms of the GNU General
     Public License Version 3.0. You may not use this file except in
     compliance with the license. Any of the license terms and conditions
@@ -9,14 +9,17 @@
 
     Copyright (c) 2013 by ikkez
     Christian Knuth <mail@ikkez.de>
- 
-        @version 0.4.0
-        @date: 24.04.13 
+
+        @version 0.4.1
+        @date: 24.04.13
  **/
 
 class Router extends Prefab {
 
-    /**
+   public
+	 $basehref;
+
+   /**
      * register a new route
      * @param     $name
      * @param     $pattern
@@ -28,18 +31,14 @@ class Router extends Prefab {
     {
         if(is_array($pattern))
             trigger_error('set multiple routes are not supported');
+        /** @var Base $f3 */
         $f3 = \Base::instance();
-    	if(substr($pattern, 0, 3) === 'MAP') {
-		  $map_pattern = substr($pattern, 3);
-		  if(strstr($handler, '->')) {
-			list($class, $method) = explode('->', $handler, 2);
-			$handler = $class;
-		  }
-		  $f3->map($map_pattern,$handler,$ttl,$kbps);
-		}
-		else { $f3->route($pattern,$handler,$ttl,$kbps); }
-        $expl = explode(' ',$pattern,2);
-        $f3->set('ROUTES["'.$expl[1].'"].name',$name);
+        $expl = explode(' ', $pattern, 2);
+        if ($expl[0] === 'MAP')
+            $f3->map($expl[1], $handler, $ttl, $kbps);
+        else
+            $f3->route($pattern,$handler,$ttl,$kbps);
+        $f3->set('ROUTES["'.$expl[1].'"].name', $name);
     }
 
     /**
@@ -54,8 +53,7 @@ class Router extends Prefab {
         $routes = $f3->get('ROUTES');
         foreach($routes as $path=>$route)
             if(array_key_exists('name',$route) && $route['name'] == $name) {
-                //$match = substr($path,1);
-                $match = $path;
+                $match = substr($path,1);
                 break;
             }
         if (!isset($match))
@@ -98,7 +96,7 @@ class Router extends Prefab {
                         unset($attrib[$key]);
                     }
                 $r_params = 'array('.implode(',',$r_params).')';
-                $attrib['href'] = '<?php echo \Router::instance()->getNamedRoute('.$route_name.','.
+                $attrib['href'] = '!<?php echo \Router::instance()->basehref .\Router::instance()->getNamedRoute('.$route_name.','.
                     $r_params.'); ?>';
             } else {
                 // no route token
@@ -109,7 +107,7 @@ class Router extends Prefab {
                         $r_params[substr($key, 6)] = $value;
                         unset($attrib[$key]);
                     }
-                $attrib['href'] = self::instance()->getNamedRoute($attrib['route'],$r_params);
+                $attrib['href'] = self::instance()->basehref.self::instance()->getNamedRoute($attrib['route'],$r_params);
             }
             unset($attrib['route']);
         }
@@ -124,5 +122,6 @@ class Router extends Prefab {
     public function __construct()
     {
         Template::instance()->extend('a', 'Router::renderLink');
+		$this->basehref = '';
     }
 }
