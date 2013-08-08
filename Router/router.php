@@ -10,14 +10,20 @@
     Copyright (c) 2013 by ikkez
     Christian Knuth <mail@ikkez.de>
 
-        @version 0.4.1
+        @version 0.5.0
         @date: 24.04.13
  **/
 
 class Router extends Prefab {
 
    public
-	 $basehref;
+	 /**
+	  * set default state for urls: absolute, web root or relational.  Each link
+	  * can be over written at the tag level using the absolute attribute
+	  *
+	  * @var int $basehref
+	  */
+	 $basehref = false;
 
    /**
      * register a new route
@@ -31,7 +37,6 @@ class Router extends Prefab {
     {
         if(is_array($pattern))
             trigger_error('set multiple routes are not supported');
-        /** @var Base $f3 */
         $f3 = \Base::instance();
         $expl = explode(' ', $pattern, 2);
         if ($expl[0] === 'MAP')
@@ -76,6 +81,7 @@ class Router extends Prefab {
     {
         $attrib = $node['@attrib'];
         $params = '';
+        $queryString = '';
         if(array_key_exists('route', $attrib)) {
             if (array_key_exists('href', $attrib))
                 unset($attrib['href']);
@@ -83,37 +89,94 @@ class Router extends Prefab {
             // process tokens
             $tmp = \Template::instance();
             $route_name = $attrib['route'];
-            // find route token
-            if(preg_match('/{{(.+?)}}/s',$route_name)) {
-                $route_name = $tmp->token($route_name);
-                foreach ($attrib as $key => $value)
-                    if (is_int(strpos($key, 'param-'))) {
+            $absolute = (int)self::instance()->basehref;
+            $addQueryString = false;
+            // find dynamic route token
+            if (preg_match('/{{(.+?)}}/s', $route_name))
+                $dyn_route_name = $tmp->token($route_name);
+            foreach ($attrib as $key => $value) {
+                // fetch route token parameters
+                if (is_int(strpos($key, 'param-'))) {
+                    if (isset($dyn_route_name)) {
                         if (preg_match('/{{(.+?)}}/s', $value))
                             $value = $tmp->token($value);
                         else
-                            $value=var_export($value,true);
+                            $value = var_export($value, true);
                         $r_params[] = "'".substr($key, 6)."'=>$value";
-                        unset($attrib[$key]);
-                    }
-                $r_params = 'array('.implode(',',$r_params).')';
-                $attrib['href'] = '!<?php echo \Router::instance()->basehref .\Router::instance()->getNamedRoute('.$route_name.','.
-                    $r_params.'); ?>';
-            } else {
-                // no route token
-                foreach ($attrib as $key => $value)
-                    if (is_int(strpos($key, 'param-'))) {
+                    } else {
                         if (preg_match('/{{(.+?)}}/s', $value))
                             $value = "<?php echo ".$tmp->token($value).";?>";
                         $r_params[substr($key, 6)] = $value;
-                        unset($attrib[$key]);
                     }
-                $attrib['href'] = self::instance()->basehref.self::instance()->getNamedRoute($attrib['route'],$r_params);
+                    unset($attrib[$key]);
+                }
+                // fetch query string
+                elseif ($key == 'query') {
+                    if (preg_match('/{{(.+?)}}/s', $value))
+                        $queryString .= '<?php $qvar = '.$tmp->token($value).'; '.
+                            'echo (is_array($qvar)?htmlentities(http_build_query($qvar)):$qvar);?>';
+                    else
+                        $queryString .= htmlentities($value);
+                    unset($attrib[$key]);
+                }
+                // reuse existing query string in URL
+                elseif ($key == 'addQueryString' && strtoupper($value) == 'TRUE') {
+                    $addQueryString = true;
+                    unset($attrib[$key]);
+                }
+                // absolute path option
+                elseif ($key == 'absolute') {
+                    switch(strtoupper($value)) {
+                        case 'TRUE':
+                            $absolute = 1;
+                            break;
+                        case 'FULL':
+                            $absolute = 2;
+                            break;
+                        default:
+                            $absolute = 0;
+                    }
+                    unset($attrib[$key]);
+                }
+                elseif ($key == 'section') {
+                    if (preg_match('/{{(.+?)}}/s', $value))
+                        $section = '<?php echo '.$tmp->token($value).';?>';
+                    else
+                        $section = htmlentities($value);
+                    unset($attrib[$key]);
+                }
             }
+            // route url
+            if (isset($dyn_route_name)) {
+                $r_params = 'array('.implode(',', $r_params).')';
+                $attrib['href'] = '<?php echo \Router::instance()->getNamedRoute('.$dyn_route_name.','.
+                    $r_params.'); ?>';
+            } else
+                $attrib['href'] = self::instance()->getNamedRoute($attrib['route'], $r_params);
+            // absolute path
+            if ($absolute > 0) {
+                $attrib['href'] = '/'.$attrib['href'];
+                if($absolute > 1) {
+                    $f3 = \Base::instance();
+                    $attrib['href'] = $f3->get('SCHEME').'://'.$f3->get('HOST').
+                        $f3->get('BASE').$attrib['href'];
+                }
+            }
+            // query string
+            if($addQueryString && !empty($_SERVER['QUERY_STRING'])) {
+                if(!empty($queryString))
+                    $queryString = '&'.$queryString;
+                $queryString = '<?php echo $_SERVER["QUERY_STRING"];?>'.$queryString;
+            }
+            if (!empty($queryString))
+                $attrib['href'] .= '?'.$queryString;
+            if (!empty($section))
+                $attrib['href'] .= '#'.$section;
             unset($attrib['route']);
         }
         foreach ($attrib as $key => $value)
             $params .= ' '.$key.'="'.$value.'"';
-        return '<a'.$params.'>'.$node[0].'</a>';
+        return '<a'.$params.'>'.$node[0].'</a>' .  ' - '. $absolute . ' - ' . self::instance()->basehref;
     }
 
     /**
@@ -122,6 +185,5 @@ class Router extends Prefab {
     public function __construct()
     {
         Template::instance()->extend('a', 'Router::renderLink');
-		$this->basehref = '';
     }
 }
